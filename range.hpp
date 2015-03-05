@@ -4,33 +4,47 @@
 #include <iterator>
 #include <type_traits>
 
+// Make these ranges usable inside CUDA C++ device code
+#ifdef __CUDACC__
+#define DEVICE_CALLABLE __host__ __device__
+#else
+#define DEVICE_CALLABLE
+#endif
+
 namespace util { namespace lang {
 
 namespace detail {
 
 template <typename T>
 struct range_iter_base : std::iterator<std::input_iterator_tag, T> {
+    DEVICE_CALLABLE
     range_iter_base(T current) : current(current) { }
 
+    DEVICE_CALLABLE
     T operator *() const { return current; }
 
+    DEVICE_CALLABLE
     T const* operator ->() const { return &current; }
 
+    DEVICE_CALLABLE
     range_iter_base& operator ++() {
         ++current;
         return *this;
     }
 
+    DEVICE_CALLABLE
     range_iter_base operator ++(int) {
         auto copy = *this;
         ++*this;
         return copy;
     }
 
+    DEVICE_CALLABLE
     bool operator ==(range_iter_base const& other) const {
         return current == other.current;
     }
 
+    DEVICE_CALLABLE
     bool operator !=(range_iter_base const& other) const {
         return not (*this == other);
     }
@@ -44,21 +58,25 @@ protected:
 template <typename T>
 struct range_proxy {
     struct iter : detail::range_iter_base<T> {
+        DEVICE_CALLABLE
         iter(T current) : detail::range_iter_base<T>(current) { }
     };
 
     struct step_range_proxy {
         struct iter : detail::range_iter_base<T> {
+            DEVICE_CALLABLE
             iter(T current, T step)
                 : detail::range_iter_base<T>(current), step(step) { }
 
             using detail::range_iter_base<T>::current;
 
+            DEVICE_CALLABLE
             iter& operator ++() {
                 current += step;
                 return *this;
             }
 
+            DEVICE_CALLABLE
             iter operator ++(int) {
                 auto copy = *this;
                 ++*this;
@@ -66,11 +84,13 @@ struct range_proxy {
             }
 
             // Loses commutativity. Iterator-based ranges are simply broken. :-(
+            DEVICE_CALLABLE
             bool operator ==(iter const& other) const {
                 return step > 0 ? current >= other.current
                                 : current < other.current;
             }
 
+            DEVICE_CALLABLE
             bool operator !=(iter const& other) const {
                 return not (*this == other);
             }
@@ -79,11 +99,14 @@ struct range_proxy {
             T step;
         };
 
+        DEVICE_CALLABLE
         step_range_proxy(T begin, T end, T step)
             : begin_(begin, step), end_(end, step) { }
 
+        DEVICE_CALLABLE
         iter begin() const { return begin_; }
 
+        DEVICE_CALLABLE
         iter end() const { return end_; }
 
     private:
@@ -91,14 +114,18 @@ struct range_proxy {
         iter end_;
     };
 
+    DEVICE_CALLABLE
     range_proxy(T begin, T end) : begin_(begin), end_(end) { }
 
+    DEVICE_CALLABLE
     step_range_proxy step(T step) {
         return {*begin_, *end_, step};
     }
 
+    DEVICE_CALLABLE
     iter begin() const { return begin_; }
 
+    DEVICE_CALLABLE
     iter end() const { return end_; }
 
 private:
@@ -109,57 +136,72 @@ private:
 template <typename T>
 struct infinite_range_proxy {
     struct iter : detail::range_iter_base<T> {
+        DEVICE_CALLABLE
         iter(T current = T()) : detail::range_iter_base<T>(current) { }
 
+        DEVICE_CALLABLE
         bool operator ==(iter const&) const { return false; }
 
+        DEVICE_CALLABLE
         bool operator !=(iter const&) const { return true; }
     };
 
     struct step_range_proxy {
         struct iter : detail::range_iter_base<T> {
+            DEVICE_CALLABLE
             iter(T current = T(), T step = T())
                 : detail::range_iter_base<T>(current), step(step) { }
 
             using detail::range_iter_base<T>::current;
 
+            DEVICE_CALLABLE
             iter& operator ++() {
                 current += step;
                 return *this;
             }
 
+            DEVICE_CALLABLE
             iter operator ++(int) {
                 auto copy = *this;
                 ++*this;
                 return copy;
             }
 
+            DEVICE_CALLABLE
             bool operator ==(iter const&) const { return false; }
 
+            DEVICE_CALLABLE
             bool operator !=(iter const&) const { return true; }
 
         private:
             T step;
         };
 
+        DEVICE_CALLABLE
         step_range_proxy(T begin, T step) : begin_(begin, step) { }
 
+        DEVICE_CALLABLE
         iter begin() const { return begin_; }
 
+        DEVICE_CALLABLE
         iter end() const { return  iter(); }
 
     private:
         iter begin_;
     };
 
+    DEVICE_CALLABLE
     infinite_range_proxy(T begin) : begin_(begin) { }
 
+    DEVICE_CALLABLE
     step_range_proxy step(T step) {
         return step_range_proxy(*begin_, step);
     }
 
+    DEVICE_CALLABLE
     iter begin() const { return begin_; }
 
+    DEVICE_CALLABLE
     iter end() const { return iter(); }
 
 private:
@@ -167,11 +209,13 @@ private:
 };
 
 template <typename T>
+DEVICE_CALLABLE
 range_proxy<T> range(T begin, T end) {
     return {begin, end};
 }
 
 template <typename T>
+DEVICE_CALLABLE
 infinite_range_proxy<T> range(T begin) {
     return {begin};
 }
@@ -195,17 +239,20 @@ struct has_size {
 } // namespace traits
 
 template <typename C, typename = typename std::enable_if<traits::has_size<C>::value>>
+DEVICE_CALLABLE
 auto indices(C const& cont) -> range_proxy<decltype(cont.size())> {
     return {0, cont.size()};
 }
 
 template <typename T, std::size_t N>
+DEVICE_CALLABLE
 range_proxy<std::size_t> indices(T (&)[N]) {
     return {0, N};
 }
 
 template <typename T>
 range_proxy<typename std::initializer_list<T>::size_type>
+DEVICE_CALLABLE
 indices(std::initializer_list<T>&& cont) {
     return {0, cont.size()};
 }
