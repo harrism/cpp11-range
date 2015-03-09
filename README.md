@@ -67,4 +67,24 @@ Even though the `range` function creates a proxy container and an iterator wrapp
 
 **☞ Beauty is free.**
 
+## CUDA Support
+
+This version of `range` and all other functions in this header is usable from inside [CUDA](https://developer.nvidia.com/cuda-zone) `__device__` code. It's useful for creating utilities for ["grid-stride loops](http://devblogs.nvidia.com/parallelforall/cuda-pro-tip-write-flexible-kernels-grid-stride-loops/)"], as in the following code.
+
+```c++
+using namespace util::lang;
+
+// type alias to simplify typing...
+template<typename T>
+using step_range = typename range_proxy<T>::step_range_proxy;
+
+template <typename T>
+__device__
+step_range<T> grid_stride_range(T begin, T end) {
+    return range(T(begin + blockDim.x * blockIdx.x + threadIdx.x), end)
+      .step(gridDim.x * blockDim.x);
+}
+```
+
+
 [Boost.Range]: http://www.boost.org/doc/libs/1_54_0/libs/range/doc/html/index.html
