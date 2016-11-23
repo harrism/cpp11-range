@@ -34,4 +34,7 @@ int main() {
 
     for (auto i : indices("foobar").step(2))
         cout << i << '\n';
+
+    for(size_t i:range(0,2))
+        cout << i << '\n';
 }

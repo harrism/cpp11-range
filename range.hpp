@@ -208,9 +208,17 @@ private:
     iter begin_;
 };
 
+namespace traits{
+    // fix issue int(0) and size_t
+    template <typename T>
+    struct identity {
+        typedef T value_type;
+    };
+}
+
 template <typename T>
 DEVICE_CALLABLE
-range_proxy<T> range(T begin, T end) {
+range_proxy<T> range(T begin, typename traits::identity<T>::value_type end) {
     return {begin, end};
 }
 
